@@ -57,6 +57,13 @@ ifdef(`WITH_UPDATE',
   var OD : ObjectDeps .',
 `  var B : Cid .')
 
+ifdef(`POR', dnl
+`define(`PREPOR', `')
+ define(`POSTPOR', `')',dnl
+`define(`PREPOR', `')'
+`define(`POSTPOR', `')' 
+ )dnl
+
 dnl Define the clock and the variables needed to address clocks.
 dnl
 dnl If WITH_TIME is not defined, CLOCK will be defined to empty.

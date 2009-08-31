@@ -251,6 +251,11 @@ ifdef(`MODELCHECK',dnl
 
     var CN : Configuration .
 
+ifdef(`POR',dnl
+--- POR object to manage backtracking
+    op <por ActObj: _ > : Oid -> Object .
+,)dnl
+
     --- Insert a warning into the current state.
     op warn : State String -> State .
     eq warn({ CN }, M) = { warning(M) CN } .
