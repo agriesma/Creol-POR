@@ -253,7 +253,8 @@ ifdef(`MODELCHECK',dnl
 
 ifdef(`POR',dnl
 --- POR object to manage backtracking
-    op <por ActObj: _ > : Oid -> Object .
+    op <por ActObj: _ Cnt: _ > : Oid Nat -> Object .
+    op <por ActObj: _ Cnt: _ Hist: _ > : Oid Nat DataList -> Object .
 ,)dnl
 
     --- Insert a warning into the current state.
@@ -270,7 +271,8 @@ ifdef(`POR',dnl
     --- System initialisation, new style.
     op main : State String DataList -> State .
     eq main({ CN }, B, DL) =
-      { CN < ob("main") : Start | Att: noSubst, 
+      { CN ifdef(`POR', <por ActObj: ob("main") Cnt: 0 Hist: emp >
+,)< ob("main") : Start | Att: noSubst, 
              Pr: { "var" |-> null | new("var" ; B ; DL) },
              PrQ: noProc, Lcnt: 0 > } .
 

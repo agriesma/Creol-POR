@@ -58,10 +58,13 @@ ifdef(`WITH_UPDATE',
 `  var B : Cid .')
 
 ifdef(`POR', dnl
-`define(`PREPOR', `')
- define(`POSTPOR', `')',dnl
-`define(`PREPOR', `')'
-`define(`POSTPOR', `')' 
+  var POR_F : Nat .
+  var POR_DL : DataList .
+`define(`PREPOR', `<por ActObj: ob("main") Cnt: POR_F Hist: POR_DL >
+')
+ define(`POSTPOR', `<por ActObj: ob("main") Cnt: POR_F + 1 Hist: POR_DL :: O >')',dnl
+`define(`PREPOR',)'
+`define(`POSTPOR',)' 
  )dnl
 
 dnl Define the clock and the variables needed to address clocks.
@@ -87,24 +90,30 @@ ifdef(`MODELCHECK',dnl
     --- of the assignment are evaluated and the statement is rewritten to
     --- an assign form.
 STEP(dnl
+PREPOR
 `< O : C | Att: S, Pr: { L | assign(AL ; EL) ; SL },
 	    PrQ: W, Lcnt: F >' CLOCK,
+POSTPOR
 `< O : C | Att: S, Pr: { L | $assign(AL ; EVALLIST(EL, (S :: L), T)) ; SL }, 
 	    PrQ: W, Lcnt: F >' CLOCK,
 `[label assignment]')
 
 eq
+  PREPOR 
   < O : C | Att: S, Pr: { L | $assign((Q @ B), AL ; D :: DL) ; SL },
     PrQ: W, Lcnt: F >
   =
-    < O : C | Att: insert(Q, D, S), Pr: { L | $assign(AL ; DL) ; SL },
+  POSTPOR 
+  < O : C | Att: insert(Q, D, S), Pr: { L | $assign(AL ; DL) ; SL },
       PrQ: W, Lcnt: F > 
   [label do-static-assign] .
 
 eq
+  PREPOR
   < O : C | Att: S, Pr: { L | $assign( (Q, AL) ; D :: DL) ; SL },
     PrQ: W, Lcnt: F >
   =
+  POSTPOR
   if $hasMapping(L, Q) then
     < O : C | Att: S, Pr: { insert(Q, D, L) | $assign(AL ; DL) ; SL },
       PrQ: W, Lcnt: F > 
@@ -119,23 +128,29 @@ eq
 --- Skip
 ---
 STEP(dnl
+PREPOR
 `< O : C | Att: S, Pr: { L | skip ; SL }, PrQ: W, Lcnt: F >',
+POSTPOR
 `< O : C | Att: S, Pr: { L | SL }, PrQ: W, Lcnt: F >',
 `[label skip]')
 
 
 --- Commit a transaction.
     rl
+      PREPOR
       < O : C | Att: S, Pr: { L | commit ; SL }, PrQ: W, Lcnt: F >
       =>
+      POSTPOR
       < O : C | Att: S, Pr: { L | SL }, PrQ: W, Lcnt: F >
       [label commit] .
 
 --- if_then_else
 ---
 STEP(dnl
+PREPOR
 `< O : C | Att: S, Pr: { L | if E th SL1 el SL2 fi ; SL }, PrQ: W, Lcnt: F >
   CLOCK',
+POSTPOR
 `if EVAL(E, (S :: L), T) asBool then
     < O : C | Att: S, Pr: { L | SL1 ; SL }, PrQ: W, Lcnt: F >
   else
@@ -151,8 +166,10 @@ STEP(dnl
 --- Therefore, it is always a rule.
 ---
 rl
+  PREPOR
   < O : C | Att: S, Pr: { L | while E do SL1 od ; SL }, PrQ: W, Lcnt: F >
   =>
+  POSTPOR
   < O : C | Att: S,
             Pr: { L | if E th (SL1 ; while E do SL1 od) el skip fi ; SL },
             PrQ: W, Lcnt: F >
@@ -164,9 +181,12 @@ rl
 --- Choice is comm, so [choice] considers both SL1 and SL2.
 ---
 crl
-  { < O : C | Att: S, Pr: { L | (SL1 [] SL2); SL }, PrQ: W, Lcnt: F > CN CLOCK }
+
+  { PREPOR 
+    < O : C | Att: S, Pr: { L | (SL1 [] SL2); SL }, PrQ: W, Lcnt: F > CN CLOCK }
   =>
-  { < O : C | Att: S, Pr: { L | SL1 ; SL }, PrQ: W, Lcnt: F > CN CLOCK }
+  { POSTPOR
+    < O : C | Att: S, Pr: { L | SL1 ; SL }, PrQ: W, Lcnt: F > CN CLOCK }
   if READY(SL1, (S :: L), CN, T)
   [label choice] .
 
@@ -207,7 +227,9 @@ ifdef(`WITH_MERGE',
 --- The release statement is an unconditional processor release point.
 ---
 STEP(dnl
+PREPOR
 `< O : C | Att: S, Pr: { L | release ; SL }, PrQ: W, Lcnt: F >',
+POSTPOR
 `< O : C | Att: S, Pr: idle, PrQ: W , { L | SL }, Lcnt: F >',
 `[label release]')
 
@@ -215,8 +237,10 @@ STEP(dnl
 --- suspend
 ---
 CSTEP(dnl
-`{ < O : C | Att: S, Pr: { L | SST ; SL }, PrQ: W, Lcnt: F > CN CLOCK }',
-`{ < O : C | Att: S, Pr: idle, PrQ: W , { L | SST ; SL}, Lcnt: F > CN CLOCK }',
+`{ PREPOR dnl
+< O : C | Att: S, Pr: { L | SST ; SL }, PrQ: W, Lcnt: F > CN CLOCK }',
+`{ POSTPOR dnl
+< O : C | Att: S, Pr: idle, PrQ: W , { L | SST ; SL}, Lcnt: F > CN CLOCK }',
 not ENABLED(SST, (S :: L), CN, T),
 `[label suspend]')
 
@@ -224,15 +248,19 @@ not ENABLED(SST, (S :: L), CN, T),
 --- await
 ---
 CSTEP(dnl
-`{ < O : C | Att: S, Pr: { L | await E ; SL }, PrQ: W, Lcnt: F > CN CLOCK }',
-`{ < O : C | Att: S, Pr: { L | SL }, PrQ: W, Lcnt: F > CN CLOCK }',
+`{ PREPOR dnl
+< O : C | Att: S, Pr: { L | await E ; SL }, PrQ: W, Lcnt: F > CN CLOCK }',
+`{ POSTPOR dnl
+< O : C | Att: S, Pr: { L | SL }, PrQ: W, Lcnt: F > CN CLOCK }',
 `EVALGUARD(E, (S :: L), CN, T) asBool'
 `[label await]')
 
 --- Optimize label access in await statements.
 eq
+  PREPOR dnl
   < O : C | Att: S, Pr: { L | await ?(A) ; SL }, PrQ: W, Lcnt: F >
   =
+  POSTPOR dnl
   < O : C | Att: S, Pr: { L | await ?(L[A]) ; SL }, PrQ: W, Lcnt: F >
   .
 
@@ -242,9 +270,11 @@ eq
 --- Must be a rule to preserve confluence.
 ---
 crl
-  { < O : C | Att: S, Pr: idle, PrQ: W , { L | SL }, Lcnt: F > CN CLOCK }
+  { PREPOR dnl
+  < O : C | Att: S, Pr: idle, PrQ: W , { L | SL }, Lcnt: F > CN CLOCK }
   =>
-  { < O : C | Att: S, Pr: { L | SL }, PrQ: W, Lcnt: F > CN CLOCK }
+  { POSTPOR dnl
+  < O : C | Att: S, Pr: { L | SL }, PrQ: W, Lcnt: F > CN CLOCK }
   if READY(SL, (S :: L), CN, T)
   [label PrQ-ready] .
 
@@ -254,7 +284,10 @@ crl
 
 --- OPTIMISATION: Reduce the value of a label in a process to avoid
 --- constant re-evaluation
-eq < O : C | Att: S, Pr: { L | get(A ; AL) ; SL }, PrQ: W, Lcnt: F > =
+
+eq PREPOR dnl
+   < O : C | Att: S, Pr: { L | get(A ; AL) ; SL }, PrQ: W, Lcnt: F > =
+POSTPOR dnl
   < O : C | Att: S, Pr: { L | get(L[A] ; AL) ; SL }, PrQ: W, Lcnt: F > .
 
 
@@ -265,9 +298,11 @@ eq < O : C | Att: S, Pr: { L | get(A ; AL) ; SL }, PrQ: W, Lcnt: F > =
 --- in the queue.
 ---
 rl
+  PREPOR dnl
   < O : C |  Att: S, Pr: { L | get(N ; AL) ; SL }, PrQ: W, Lcnt: F >
   < N : Future | Completed: true, References: G, Value: DL >
   =>
+  POSTPOR dnl
   < O : C |  Att: S, Pr: { L | assign(AL ; DL) ; SL }, PrQ: W, Lcnt: F >
   < N : Future | Completed: true, References: G, Value: DL >
   [label receive-comp] .
@@ -276,7 +311,9 @@ rl
 --- local-reply
 ---
 CSTEP(dnl
+PREPOR dnl
 `< O : C | Att: S, Pr: { L | get(N ; AL) ; SL }, PrQ: W , { L1 | SL1 }, Lcnt: F >',
+POSTPOR dnl
 `< O : C | Att: S, Pr:  { L1 | SL1 ; $cont N },
   PrQ: W , { L | get(N ; AL) ; SL }, Lcnt: F >',
 `L1[".label"] == N',
@@ -292,9 +329,11 @@ CSTEP(dnl
 --- because there might be two processes in PrQ which await a reply to the
 --- label.
 rl
+  PREPOR dnl
   < O : C | Att: S, Pr: { L | $cont N }, PrQ: W , { L1 | get(N ; AL) ; SL1},
     Lcnt: F >
   =>
+  POSTPOR dnl
   < O : C | Att: S, Pr: { L1 | get(N ; AL) ; SL1 }, PrQ: W,
     Lcnt: F >
   [label continue] .
@@ -313,8 +352,10 @@ ifdef(`MODELCHECK',
   if N := label(O, O, Q, EVALLIST(EL, (S :: L), T))'
 ,
 `crl
+  PREPOR dnl
   < O : C | Att: S, Pr: { L | static( A ; Q ; CC ; None ; EL ); SL }, PrQ: W, Lcnt: F > CLOCK
   =>
+  POSTPOR dnl
   < O : C | Att: S, Pr: { insert (A, N, L) | SL }, PrQ: W, Lcnt: (s F) >
   < N : Future | Completed: false, References: 1, Value: emp >
   bindMtd(O, O, N, Q, EVALLIST(EL, (S :: L), T), CC < emp >) CLOCK
@@ -337,8 +378,10 @@ ifdef(`MODELCHECK',
   /\ O =/= O1'
 ,dnl
 `crl
+  PREPOR dnl
   < O : C | Att: S, Pr: { L | call(A ; E ; Q ; EL); SL }, PrQ: W, Lcnt: F > CLOCK
   =>
+  PREPOR dnl
   < O : C | Att: S, Pr: { insert(A, N, L) | SL }, PrQ: W, Lcnt: (s F) > CLOCK
   invoc(O, O1, N, Q , DL)
   if DL :=  EVALLIST(EL, (S :: L), T)
@@ -360,8 +403,10 @@ ifdef(`MODELCHECK',
      O = EVAL(E, (S :: L), T)'
 ,dnl
 `crl
+  PREPOR dnl
   < O : C | Att: S, Pr: { L | call(A ; E ; Q ; EL); SL }, PrQ: W, Lcnt: F > CLOCK
   =>
+  POSTPOR dnl
   < O : C | Att: S, Pr: { insert(A, N, L) | SL }, PrQ: W, Lcnt: (s F) > CLOCK
   invoc(O, O, N, Q , EVALLIST(EL, (S :: L), T))
   if N := label(O, F) /\ O = EVAL(E, (S :: L), T)'
@@ -370,16 +415,20 @@ ifdef(`MODELCHECK',
 
 
 
-STEP(`< O : C | Att: S, Pr: { L | multicast(E ; Q ; EL) ; SL }, PrQ: W,
+STEP(PREPOR dnl
+`< O : C | Att: S, Pr: { L | multicast(E ; Q ; EL) ; SL }, PrQ: W,
             Lcnt: F > CLOCK',
+POSTPOR dnl
 `< O : C | Att: S, Pr: { L | $multicast(EVAL(E, (S :: L), T) ; Q ; EVALLIST(EL, (S :: L), T)) ; SL }, PrQ: W,
             Lcnt: F > CLOCK',
 `[label multicast-eval]')
 
 eq 
+  PREPOR dnl
   < O : C | Att: S, Pr: { L | $multicast(list(emp) ; Q ; DL) ; SL }, PrQ: W,
             Lcnt: F >
   =
+  POSTPOR dnl
   < O : C | Att: S, Pr: { L | SL }, PrQ: W, Lcnt: F >
   [label multicast-emit-list-emp] .
 
@@ -392,18 +441,22 @@ ifdef(`MODELCHECK',
             PrQ: W, Lcnt: F >
   invoc(O, O1, label(O, O1, Q, DL2), Q, DL2)',
 `eq
+  PREPOR dnl
   < O : C | Att: S, Pr: { L | $multicast(list('O1` :: DL) ; Q ; DL2) ; SL },
             PrQ: W, Lcnt: F >
   =
+  POSTPOR dnl
   < O : C | Att: S, Pr: { L | $multicast(list(DL) ; Q ; DL2) ; SL },
             PrQ: W, Lcnt: (s F) >
   invoc(O, O1, label(O, F), Q , DL2)')
   [label multicast-emit-list] .
 
 eq 
+  PREPOR dnl
   < O : C | Att: S, Pr: { L | $multicast(set(emptyset) ; Q ; DL); SL },
             PrQ: W, Lcnt: F >
   =
+  POSTPOR dnl
   < O : C | Att: S, Pr: { L | SL }, PrQ: W, Lcnt: F >
   [label multicast-emit-set-emp] .
 
@@ -416,9 +469,11 @@ ifdef(`MODELCHECK',
             PrQ: W, Lcnt: F >
   invoc(O, O1, label(O, O1, Q, DL2), Q, DL2)',
 `eq
+  PREPOR dnl
   < O : C | Att: S, Pr: { L | $multicast(set('O1` : DS) ; Q ; DL2) ; SL },
             PrQ: W, Lcnt: F >
   =
+  POSTPOR dnl
   < O : C | Att: S, Pr: { L | $multicast(set(DS) ; Q ; DL2) ; SL },
             PrQ: W, Lcnt: (s F) >
   invoc(O, O1, label(O, F), Q , DL2)')
@@ -426,8 +481,10 @@ ifdef(`MODELCHECK',
 
 --- return
 ---
-CSTEP(`< O : C |  Att: S, Pr: { L | return(EL); SL }, PrQ: W, Lcnt: F > CLOCK
+CSTEP(PREPOR dnl
+`< O : C |  Att: S, Pr: { L | return(EL); SL }, PrQ: W, Lcnt: F > CLOCK
   < N : Future | Completed: false, References: G, Value: emp >',
+POSTPOR dnl
 `< O : C |  Att: S, Pr: { L | SL }, PrQ: W, Lcnt: F > CLOCK
   < N : Future | Completed: true, References: G, Value: EVALLIST(EL, (S :: L), T) >',
 `N == L[".label"]',
@@ -439,9 +496,11 @@ CSTEP(`< O : C |  Att: S, Pr: { L | return(EL); SL }, PrQ: W, Lcnt: F > CLOCK
 --- Receive an invocation message to bind the method body.
 ---
 eq
+  PREPOR dnl
   < O : C | Att: S, Pr: P, PrQ: W, Lcnt: F >
   invoc(O1, O, N, Q, DL)
   =
+  POSTPOR dnl
   < O : C | Att: S, Pr: P, PrQ: W, Lcnt: F >
   < N : Future | Completed: false, References: 1, Value: emp >
   bindMtd(O, O1, N, Q, DL, C < emp >)
@@ -453,8 +512,10 @@ eq
 ---
 --- sd(G,1) works, because G is always positive. Maude does not have
 --- a nice decrement operator.
-CSTEP(`< O : C | Att: S, Pr: { L | free(A) ; SL }, PrQ: W, Lcnt: F >
+CSTEP(PREPOR dnl
+`< O : C | Att: S, Pr: { L | free(A) ; SL }, PrQ: W, Lcnt: F >
   < N : Future | Completed: CO, References: G, Value: DL >',
+POSTPOR dnl
 `< O : C | Att: S, Pr: { insert(A, null, L) | SL }, PrQ: W, Lcnt: F >
   < N : Future | Completed: CO, References: sd(G, 1), Value: DL >',
 `N = L[A]',
@@ -466,8 +527,10 @@ CSTEP(`< O : C | Att: S, Pr: { L | free(A) ; SL }, PrQ: W, Lcnt: F >
 --- Fake the caller and the label and tag the label.  Since we do not
 --- want to interleave, this can also be an equation.
 ---
-STEP(`< O : C | Att: S, Pr: { L | tailcall(E ; Q ; EL) ; SL }, PrQ: W,
+STEP(PREPOR dnl
+`< O : C | Att: S, Pr: { L | tailcall(E ; Q ; EL) ; SL }, PrQ: W,
             Lcnt: F >' CLOCK,
+POSTPOR dnl
 `< O : C | Att: S, Pr: { L | SL }, PrQ: W, Lcnt: F >
   invoc(O, EVAL(E, (S :: L), T), L[".label"], Q, EVALLIST(EL, (S :: L), T))'
   CLOCK,
@@ -478,22 +541,28 @@ STEP(`< O : C | Att: S, Pr: { L | tailcall(E ; Q ; EL) ; SL }, PrQ: W,
 --- Fake the caller and the label and tag the label.  Since we do not
 --- want to interleave, this can also be an equation.
 ---
-STEP(`< O : C | Att: S, Pr: { L | statictail(Q ; None ; None ; EL) ; SL }, PrQ: W, Lcnt: F >' CLOCK,
+STEP(PREPOR dnl
+`< O : C | Att: S, Pr: { L | statictail(Q ; None ; None ; EL) ; SL }, PrQ: W, Lcnt: F >' CLOCK,
+POSTPOR dnl
 `< O : C | Att: S, Pr: { noSubst | $accept tag(L[".label"])  }, PrQ: W, Lcnt: F >
   bindMtd(O, O, tag(L[".label"]), Q, EVALLIST(EL, (S :: L), T), C < emp >)'
   CLOCK,
 `[label local-tailcall]')
 
-STEP(`< O : C | Att: S, Pr: { L | statictail(Q ; CC ; None ; EL) ; SL }, PrQ: W, Lcnt: F >' CLOCK,
+STEP(PREPOR dnl
+`< O : C | Att: S, Pr: { L | statictail(Q ; CC ; None ; EL) ; SL }, PrQ: W, Lcnt: F >' CLOCK,
+POSTPOR dnl
 `< O : C | Att: S, Pr: { noSubst | $accept tag(L[".label"]) }, PrQ: W, Lcnt: F >
   bindMtd(O, O, tag(L[".label"]), Q, EVALLIST(EL, (S :: L), T), CC < emp >)' CLOCK,
 `[label static-tailcall]')
 
 *** If we receive the method body, the call is accepted and the label untagged.
 crl
+  PREPOR dnl
   < O : C | Att: S, Pr: { noSubst | $accept N }, PrQ: W , { L | SL },
          Lcnt: F >
   =>
+  POSTPOR dnl
   < O : C | Att: S, Pr: { insert(".label", tag(N), L) | SL }, PrQ: W,
             Lcnt: F >
   if L[".label"] = N
@@ -514,10 +583,12 @@ crl
 --- message below and will not have attributes before that.
 ---
 STEP(dnl
+PREPOR dnl
 `< O : C | Att: S, Pr: { L | new(A ; B ; EL); SL }, PrQ: W, Lcnt: F >
   < CLASS(B, T) : Class | VERSION(V)Inh: I , Param: AL, Att: S1, Mtds: MS, Ocnt: G >
   CLOCK'dnl
 ,dnl
+POSTPOR dnl
 `< O : C | Att: S, Pr: { L | assign(A ; newId(B, G)); SL }, PrQ: W, Lcnt: (s F) >
   <  CLASS(B, T) : Class | VERSION(V)Inh: I, Param: AL, Att: S1, Mtds: MS, Ocnt: (s G) >
   < newId(B, G) :  CLASS(B, T) | Att: noSubst, Pr: idle, PrQ: noProc, Lcnt: 0 >
