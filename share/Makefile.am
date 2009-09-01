@@ -20,6 +20,7 @@
 MOSTLYCLEANFILES	= *~
 CLEANFILES		= 
 DISTCLEANFILES		= creol-interpreter.maude \
+			  creol-porinterpreter.maude \
 			  creol-modelchecker.maude \
 			  creol-realtime.maude \
 			  creol-update.maude
@@ -35,12 +36,17 @@ dist_pkgdata_DATA	= creol.xsd \
 			  creol-metaexec.maude \
 			  prelude.creol
 pkgdata_DATA		= creol-interpreter.maude \
+			  creol-porinterpreter.maude \
 			  creol-modelchecker.maude \
 			  creol-realtime.maude \
 			  creol-update.maude
 
 creol-interpreter.maude: $(srcdir)/interpreter.m4
 	$(M4) $(M4FLAGS) -I$(srcdir) $(CREOL_VARIANT) $< > $@
+
+creol-porinterpreter.maude: $(srcdir)/interpreter.m4
+	$(M4) -I$(srcdir) -DPOR $(CREOL_VARIANT) $< > $@
+
 
 creol-modelchecker.maude: $(srcdir)/interpreter.m4
 	$(M4) $(M4FLAGS) -I$(srcdir) -DMODELCHECK $(CREOL_VARIANT) $< > $@
@@ -59,6 +65,14 @@ creol-interpreter.maude: ${srcdir}/statements.m4
 creol-interpreter.maude: ${srcdir}/evaluation.m4
 creol-interpreter.maude: ${srcdir}/configuration.m4
 creol-interpreter.maude: ${srcdir}/configuration2.m4
+creol-porinterpreter.maude: ${srcdir}/macros.m4 ${srcdir}/machine.m4
+creol-porinterpreter.maude: ${srcdir}/subst.m4 ${srcdir}/process.m4
+creol-porinterpreter.maude: ${srcdir}/class-id.m4 ${srcdir}/inherits.m4
+creol-porinterpreter.maude: ${srcdir}/object-id.m4 ${srcdir}/methods.m4
+creol-porinterpreter.maude: ${srcdir}/statements.m4
+creol-porinterpreter.maude: ${srcdir}/evaluation.m4
+creol-porinterpreter.maude: ${srcdir}/configuration.m4
+creol-porinterpreter.maude: ${srcdir}/configuration2.m4
 creol-modelchecker.maude: ${srcdir}/macros.m4  ${srcdir}/machine.m4
 creol-modelchecker.maude: ${srcdir}/subst.m4 ${srcdir}/process.m4
 creol-modelchecker.maude: ${srcdir}/class-id.m4 ${srcdir}/inherits.m4
